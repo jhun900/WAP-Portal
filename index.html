@@ -914,7 +914,7 @@
                 const { data, error } = await supabaseClient
                     .from('profiles')
                     .select('credits')
-                    .eq('id', currentUserUID)
+                    .eq('id', userId);
                     .single();
 
                 if (error && error.code === 'PGRST116') {
