@@ -806,14 +806,14 @@
 
     </main>
 
-    <script>
+  <script>
         // --- 0. CREDENTIALS & SUPABASE INITIALIZATION ---
         const SUPABASE_URL = 'https://zprhuqcvtruqgxpybmtf.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpwcmh1cWN2dHJ1cWd4cHlibXRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNTAzODMsImV4cCI6MjA5OTcyNjM4M30.NDjq_gKWAisHoTaoyYGXwtTgo77vKaGnBrKCjana4Ek';
         const EDGE_FUNCTION_URL = 'https://zprhuqcvtruqgxpybmtf.supabase.co/functions/v1/my_webhook';
         const CLIENT_ID = '234617879687-3crdscg9v65u7d531o6dgf3ma47f6nr2.apps.googleusercontent.com';
 
-        // Initialize Supabase Client without shadowing window.supabase
+        // Initialize Supabase Client
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // State variables
@@ -910,7 +910,7 @@
 
         async function initializeUserCredits() {
             try {
-                // Fixed logic chain to use mapped column IDs safely
+                // FIXED: Explicitly referencing global 'currentUserUID'
                 const { data, error } = await supabaseClient
                     .from('profiles')
                     .select('credits')
@@ -918,14 +918,18 @@
                     .single();
 
                 if (error && error.code === 'PGRST116') {
+                    // Try to insert the new profile if it doesn't exist yet
                     const { data: newUser, error: insertError } = await supabaseClient
                         .from('profiles')
                         .insert([{ id: currentUserUID, credits: 5 }])
                         .select()
                         .single();
                     
-                    if(!insertError) {
+                    if(!insertError && newUser) {
                         currentCredits = newUser.credits;
+                    } else {
+                        // Fallback if RLS or DB prevents anonymous insertions
+                        currentCredits = 5; 
                     }
                 } else if (data) {
                     currentCredits = data.credits;
@@ -978,7 +982,6 @@
             }
         }
 
-        // Check credits before executing export
         async function exportToWordWithCredits() {
             if (!currentUserUID) {
                 alert("Unable to verify user profile. Please reload the page.");
@@ -1001,11 +1004,9 @@
 
         async function deductCredit() {
             try {
-                // Optimistically decrease UI counter
                 currentCredits -= 1;
                 updateCreditUI();
 
-                // Call the secure Database Function RPC instead of updating client-side directly
                 const { error } = await supabaseClient.rpc('deduct_credits', {
                     user_id_input: currentUserUID,
                     amount_to_deduct: 1 
@@ -1013,7 +1014,6 @@
 
                 if (error) {
                     console.error("Failed to sync credit deduction with database server:", error.message);
-                    // Rollback UI counter state if database fails
                     currentCredits += 1;
                     updateCreditUI();
                     alert("Credit deduction failed: " + error.message);
@@ -1187,7 +1187,7 @@
 
             } catch (error) {
                 console.error("AI Generation Failed:", error);
-                alert(`Generation Failed: ${error.message}\n\nPlease check that you pasted a valid Mistral API Key at the top of the script.`);
+                alert(`Generation Failed: ${error.message}`);
             } finally {
                 btnGenerate.innerHTML = originalText;
                 btnGenerate.disabled = false;
@@ -1198,7 +1198,6 @@
         function exportToWord() {
             const documentContent = document.getElementById('printableArea').innerHTML;
             
-            // FIX: Removed broken markdown reference formatting inside JS template literal string block
             const wordHeader = `
             <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='[http://www.w3.org/TR/REC-html40](http://www.w3.org/TR/REC-html40)'>
             <head>
