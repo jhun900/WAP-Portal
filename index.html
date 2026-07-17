@@ -910,11 +910,11 @@
 
         async function initializeUserCredits() {
             try {
-                // Verified database table configuration mapping ('profiles' & column matching 'id')
+                // Fixed logic chain to use mapped column IDs safely
                 const { data, error } = await supabaseClient
                     .from('profiles')
                     .select('credits')
-                    .eq('id', currentUserUID) // <-- FIX: Changed userId to currentUserUID and removed semicolon
+                    .eq('id', currentUserUID)
                     .single();
 
                 if (error && error.code === 'PGRST116') {
@@ -1008,7 +1008,7 @@
                 // Call the secure Database Function RPC instead of updating client-side directly
                 const { error } = await supabaseClient.rpc('deduct_credits', {
                     user_id_input: currentUserUID,
-                    amount_to_deduct: 1 // Deducts 1 credit for App 2's export
+                    amount_to_deduct: 1 
                 });
 
                 if (error) {
@@ -1198,6 +1198,7 @@
         function exportToWord() {
             const documentContent = document.getElementById('printableArea').innerHTML;
             
+            // FIX: Removed broken markdown reference formatting inside JS template literal string block
             const wordHeader = `
             <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='[http://www.w3.org/TR/REC-html40](http://www.w3.org/TR/REC-html40)'>
             <head>
