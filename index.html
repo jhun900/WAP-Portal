@@ -910,16 +910,17 @@
 
         async function initializeUserCredits() {
             try {
+                // Verified database table configuration mapping ('profiles' & column matching 'id')
                 const { data, error } = await supabaseClient
-                    .from('user_profiles')
+                    .from('profiles')
                     .select('credits')
-                    .eq('user_id', currentUserUID)
+                    .eq('id', currentUserUID)
                     .single();
 
                 if (error && error.code === 'PGRST116') {
                     const { data: newUser, error: insertError } = await supabaseClient
-                        .from('user_profiles')
-                        .insert([{ user_id: currentUserUID, credits: 5 }])
+                        .from('profiles')
+                        .insert([{ id: currentUserUID, credits: 5 }])
                         .select()
                         .single();
                     
@@ -977,7 +978,7 @@
             }
         }
 
-        // Check credits before executing export (Allows guest credits as well as authenticated users)
+        // Check credits before executing export
         async function exportToWordWithCredits() {
             if (!currentUserUID) {
                 alert("Unable to verify user profile. Please reload the page.");
@@ -1000,28 +1001,25 @@
 
         async function deductCredit() {
             try {
+                // Optimistically decrease UI counter
                 currentCredits -= 1;
                 updateCreditUI();
 
-                const response = await fetch(`${EDGE_FUNCTION_URL}/deduct`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${currentAuthToken}`
-                    },
-                    body: JSON.stringify({
-                        userId: currentUserUID,
-                        amount: 1
-                    })
+                // Call the secure Database Function RPC instead of updating client-side directly
+                const { error } = await supabaseClient.rpc('deduct_credits', {
+                    user_id_input: currentUserUID,
+                    amount_to_deduct: 1 // Deducts 1 credit for App 2's export
                 });
 
-                if (!response.ok) {
-                    console.error("Failed to sync credit deduction with server.");
+                if (error) {
+                    console.error("Failed to sync credit deduction with database server:", error.message);
+                    // Rollback UI counter state if database fails
                     currentCredits += 1;
                     updateCreditUI();
+                    alert("Credit deduction failed: " + error.message);
                 }
             } catch (err) {
-                console.error("Deduction error:", err);
+                console.error("Deduction validation error:", err);
             }
         }
 
@@ -1152,7 +1150,6 @@
 
                 const data = await response.json();
                 
-                // Sanitize potential markdown syntax from AI response before parsing
                 let rawContent = data.choices[0].message.content;
                 rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
                 const aiContent = JSON.parse(rawContent);
@@ -1197,7 +1194,7 @@
             }
         }
 
-        /* --- 3. EXPORT TO EXACT WORD FILE (.doc) WITH CENTURY GOTHIC & UNIQUE ID --- */
+        /* --- 3. EXPORT TO WORD FILE (.doc) --- */
         function exportToWord() {
             const documentContent = document.getElementById('printableArea').innerHTML;
             
