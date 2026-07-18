@@ -954,33 +954,50 @@
         }
 
         async function processPayment(amountPhp, creditsToAdd) {
-            alert(`Redirecting to payment gateway for ₱${amountPhp}...`);
-            try {
-                const response = await fetch(`${EDGE_FUNCTION_URL}/topup`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${currentAuthToken}`
-                    },
-                    body: JSON.stringify({
-                        userId: currentUserUID,
-                        amount: amountPhp,
-                        credits: creditsToAdd
-                    })
-                });
+    // Note: alert() pauses the browser. Consider using a loading spinner in the UI instead.
+    alert(`Connecting to payment gateway for ₱${amountPhp}...`);
+    
+    try {
+        const response = await fetch(`${EDGE_FUNCTION_URL}/topup`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${currentAuthToken}`
+            },
+            body: JSON.stringify({
+                userId: currentUserUID,
+                amount: amountPhp,
+                credits: creditsToAdd
+            })
+        });
 
-                if(response.ok) {
-                    currentCredits += creditsToAdd;
-                    updateCreditUI();
-                    closeTopUpModal();
-                    alert(`Success! ${creditsToAdd} credits added to your account.`);
-                } else {
-                    alert("Payment failed or was cancelled.");
-                }
-            } catch (err) {
-                console.error("Payment error:", err);
+        if (response.ok) {
+            // SCENARIO A: If your backend returns a Checkout URL to redirect to
+            /*
+            const data = await response.json();
+            if (data.checkoutUrl) {
+                window.location.href = data.checkoutUrl; // This actually redirects the user
+                return;
             }
+            */
+
+            // SCENARIO B: Your current logic (Immediate success upon backend ping)
+            currentCredits += creditsToAdd;
+            updateCreditUI();
+            closeTopUpModal();
+            alert(`Success! ${creditsToAdd} credits added to your account.`);
+        } else {
+            // Log the actual backend error so you can debug it
+            const errorText = await response.text();
+            console.error("Backend error response:", errorText);
+            alert(`Payment setup failed. Server responded with an error.`);
         }
+    } catch (err) {
+        // FIX: Provide UI feedback so the user doesn't get stuck
+        console.error("Payment network error:", err);
+        alert("Network error: Could not reach the payment gateway. Please check your connection or try again later.");
+    }
+}
 
         async function exportToWordWithCredits() {
             if (!currentUserUID) {
